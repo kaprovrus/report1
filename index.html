@@ -32,12 +32,18 @@
 
       const reader = new FileReader();
       reader.onload = function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(sheet, { range: 4 });
+  const data = new Uint8Array(e.target.result);
+  const workbook = XLSX.read(data, { type: 'array' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(sheet, { range: 4, header: 1 });
 
-        const grouped = {};
+  // Показать первые 5 строк таблицы в консоли
+  console.log("Первые строки Excel:");
+  console.log(raw.slice(0, 5));
+
+  alert("Открой консоль браузера (F12 → Console), чтобы увидеть названия столбцов.");
+};
+
 
         raw.forEach(row => {
           const date = row['Учетный день'];
