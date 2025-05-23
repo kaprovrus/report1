@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Анализ заказов</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    table { border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <h2>Загрузка Excel-отчета</h2>
+  <input type="file" id="fileInput" accept=".xlsx, .xls" />
+  <div id="output"></div>
+
+  <script>
+    function getTimeSlot(timeStr) {
+      const [h, m] = timeStr.split(":").map(Number);
+      const minutes = h * 60 + m;
+      if (minutes >= 12 * 60 && minutes < 15 * 60) return "12:00-15:00";
+      if (minutes >= 15 * 60 && minutes < 18 * 60) return "15:00-18:00";
+      if (minutes >= 18 * 60 && minutes < 21 * 60) return "18:00-21:00";
+      if (minutes >= 21 * 60 && minutes < 24 * 60) return "21:00-00:00";
+      return null;
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(sheet, { range: 4 });
+
+        const grouped = {};
+
+        raw.forEach(row => {
+          const date = row['Учетный день'];
+          const time = row['Время открытия'];
+          const guests = parseInt(row['Количество гостей']) || 0;
+          let amount = String(row['Сумма со скидкой, тг'] || "").replace(/\u00A0/g, '').replace(",", ".");
+          amount = parseFloat(amount) || 0;
+
+          if (!date || !time) return;
+          const timeSlot = getTimeSlot(time.toString().substring(11, 16));
+          if (!timeSlot) return;
+
+          const key = `${date}|${timeSlot}`;
+          if (!grouped[key]) grouped[key] = { guests: 0, orders: 0, total: 0 };
+          grouped[key].guests += guests;
+          grouped[key].orders += 1;
+          grouped[key].total += amount;
+        });
+
+        const table = document.createElement("table");
+        table.innerHTML = `
+          <tr>
+            <th>Учетный день</th>
+            <th>Временной слот</th>
+            <th>Количество гостей</th>
+            <th>Средний чек (₸)</th>
+          </tr>
+        `;
+
+        Object.entries(grouped).forEach(([key, val]) => {
+          const [day, slot] = key.split("|");
+          const avg = (val.total / val.orders).toFixed(2);
+          table.innerHTML += `
+            <tr>
+              <td>${day}</td>
+              <td>${slot}</td>
+              <td>${val.guests}</td>
+              <td>${avg}</td>
+            </tr>
+          `;
+        });
+
+        document.getElementById("output").innerHTML = "";
+        document.getElementById("output").appendChild(table);
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  </script>
+</body>
+</html>
